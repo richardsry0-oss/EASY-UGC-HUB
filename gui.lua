@@ -1,207 +1,358 @@
 
--- UGC HUB | Animated Mobile UI
+-- UGC HUB | Dashboard
 -- File: gui.lua
 
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
+
 local player = Players.LocalPlayer
+local playerGui = player:WaitForChild("PlayerGui")
 
 local FARM_URL =
     "https://raw.githubusercontent.com/richardsry0-oss/EASY-UGC-HUB/main/autofarm.lua"
 
-local old = player.PlayerGui:FindFirstChild("UGCHub")
+local old = playerGui:FindFirstChild("UGCHub")
 if old then old:Destroy() end
+
+local themes = {
+    Purple = Color3.fromRGB(145, 91, 255),
+    Blue   = Color3.fromRGB(60, 145, 255),
+    Green  = Color3.fromRGB(45, 190, 125),
+    Pink   = Color3.fromRGB(255, 85, 165),
+    Orange = Color3.fromRGB(255, 145, 65),
+}
+
+local themeNames = {"Purple", "Blue", "Green", "Pink", "Orange"}
+local themeIndex = 1
+local currentSize = 100
+local tweenSeconds = 2
+local farm
+local loading = false
 
 local gui = Instance.new("ScreenGui")
 gui.Name = "UGCHub"
 gui.ResetOnSpawn = false
-gui.IgnoreGuiInset = true
-gui.Parent = player:WaitForChild("PlayerGui")
+gui.Parent = playerGui
 
-local function corner(object, radius)
-    local c = Instance.new("UICorner")
-    c.CornerRadius = UDim.new(0, radius)
-    c.Parent = object
+local function make(class, props, parent)
+    local obj = Instance.new(class)
+    for key, value in pairs(props) do
+        obj[key] = value
+    end
+    obj.Parent = parent
+    return obj
 end
 
-local function tween(object, info, properties)
-    local t = TweenService:Create(object, info, properties)
-    t:Play()
-    return t
+local function corner(obj, radius)
+    make("UICorner", {
+        CornerRadius = UDim.new(0, radius)
+    }, obj)
 end
 
-local frame = Instance.new("Frame")
-frame.Name = "Main"
-frame.Size = UDim2.fromOffset(280, 220)
-frame.Position = UDim2.new(0.5, -140, 0.5, -110)
-frame.BackgroundColor3 = Color3.fromRGB(19, 21, 29)
-frame.BorderSizePixel = 0
-frame.Active = true
-frame.Draggable = true
-frame.ClipsDescendants = true
-frame.Parent = gui
-corner(frame, 16)
+local function stroke(obj, color, thickness)
+    return make("UIStroke", {
+        Color = color,
+        Thickness = thickness,
+        Transparency = 0.15
+    }, obj)
+end
 
-local stroke = Instance.new("UIStroke")
-stroke.Color = Color3.fromRGB(91, 101, 150)
-stroke.Thickness = 1.3
-stroke.Transparency = 0.15
-stroke.Parent = frame
+local frame = make("Frame", {
+    Name = "Main",
+    Size = UDim2.fromOffset(420, 290),
+    Position = UDim2.new(0.5, -210, 0.5, -145),
+    BackgroundColor3 = Color3.fromRGB(23, 24, 34),
+    BorderSizePixel = 0,
+    Active = true,
+    Draggable = true,
+    ClipsDescendants = true
+}, gui)
+corner(frame, 14)
 
-local scale = Instance.new("UIScale")
-scale.Scale = 0.82
-scale.Parent = frame
+local scale = make("UIScale", {
+    Scale = 1
+}, frame)
 
-local header = Instance.new("Frame")
-header.Size = UDim2.new(1, 0, 0, 55)
-header.BackgroundColor3 = Color3.fromRGB(32, 35, 49)
-header.BorderSizePixel = 0
-header.Parent = frame
+local accent = themes.Purple
 
-local title = Instance.new("TextLabel")
-title.Position = UDim2.fromOffset(15, 4)
-title.Size = UDim2.new(1, -65, 0, 28)
-title.BackgroundTransparency = 1
-title.Text = "UGC HUB"
-title.TextColor3 = Color3.fromRGB(245, 246, 255)
-title.Font = Enum.Font.GothamBold
-title.TextSize = 20
-title.TextXAlignment = Enum.TextXAlignment.Left
-title.Parent = header
+local header = make("Frame", {
+    Size = UDim2.new(1, 0, 0, 53),
+    BackgroundColor3 = Color3.fromRGB(30, 31, 44),
+    BorderSizePixel = 0
+}, frame)
 
-local subtitle = Instance.new("TextLabel")
-subtitle.Position = UDim2.fromOffset(16, 30)
-subtitle.Size = UDim2.new(1, -70, 0, 16)
-subtitle.BackgroundTransparency = 1
-subtitle.Text = "AUTO FARM  •  MOBILE"
-subtitle.TextColor3 = Color3.fromRGB(157, 165, 195)
-subtitle.Font = Enum.Font.Gotham
-subtitle.TextSize = 10
-subtitle.TextXAlignment = Enum.TextXAlignment.Left
-subtitle.Parent = header
+local title = make("TextLabel", {
+    Position = UDim2.fromOffset(16, 5),
+    Size = UDim2.new(1, -70, 0, 27),
+    BackgroundTransparency = 1,
+    Text = "UGC HUB",
+    Font = Enum.Font.GothamBold,
+    TextSize = 20,
+    TextColor3 = Color3.new(1, 1, 1),
+    TextXAlignment = Enum.TextXAlignment.Left
+}, header)
 
-local close = Instance.new("TextButton")
-close.Size = UDim2.fromOffset(34, 34)
-close.Position = UDim2.new(1, -44, 0, 10)
-close.Text = "×"
-close.TextSize = 25
-close.Font = Enum.Font.Gotham
-close.TextColor3 = Color3.new(1, 1, 1)
-close.BackgroundColor3 = Color3.fromRGB(65, 68, 86)
-close.BorderSizePixel = 0
-close.Parent = header
-corner(close, 10)
+local subtitle = make("TextLabel", {
+    Position = UDim2.fromOffset(17, 30),
+    Size = UDim2.new(1, -75, 0, 15),
+    BackgroundTransparency = 1,
+    Text = "TWEEN AUTO FARM",
+    Font = Enum.Font.Gotham,
+    TextSize = 9,
+    TextColor3 = Color3.fromRGB(170, 174, 195),
+    TextXAlignment = Enum.TextXAlignment.Left
+}, header)
 
-local status = Instance.new("TextLabel")
-status.Position = UDim2.fromOffset(16, 67)
-status.Size = UDim2.new(1, -32, 0, 29)
-status.BackgroundColor3 = Color3.fromRGB(31, 34, 46)
-status.Text = "●  Ready"
-status.TextColor3 = Color3.fromRGB(190, 198, 220)
-status.Font = Enum.Font.Gotham
-status.TextSize = 12
-status.TextXAlignment = Enum.TextXAlignment.Left
-status.Parent = frame
-corner(status, 8)
+local close = make("TextButton", {
+    Position = UDim2.new(1, -43, 0, 10),
+    Size = UDim2.fromOffset(30, 30),
+    Text = "×",
+    TextSize = 22,
+    Font = Enum.Font.Gotham,
+    TextColor3 = Color3.new(1, 1, 1),
+    BackgroundColor3 = Color3.fromRGB(60, 61, 78),
+    BorderSizePixel = 0
+}, header)
+corner(close, 8)
 
-local function makeButton(text, y, color)
-    local b = Instance.new("TextButton")
-    b.Size = UDim2.new(1, -32, 0, 39)
-    b.Position = UDim2.fromOffset(16, y)
-    b.BackgroundColor3 = color
-    b.BorderSizePixel = 0
-    b.Text = text
-    b.TextColor3 = Color3.new(1, 1, 1)
-    b.Font = Enum.Font.GothamBold
-    b.TextSize = 13
-    b.AutoButtonColor = true
-    b.Parent = frame
-    corner(b, 10)
+local sidebar = make("Frame", {
+    Position = UDim2.fromOffset(10, 63),
+    Size = UDim2.new(0, 112, 1, -73),
+    BackgroundColor3 = Color3.fromRGB(29, 30, 43),
+    BorderSizePixel = 0
+}, frame)
+corner(sidebar, 10)
+
+local content = make("Frame", {
+    Position = UDim2.fromOffset(132, 63),
+    Size = UDim2.new(1, -142, 1, -73),
+    BackgroundTransparency = 1
+}, frame)
+
+local function label(parent, text, pos, size, textSize)
+    return make("TextLabel", {
+        Position = pos,
+        Size = size,
+        BackgroundTransparency = 1,
+        Text = text,
+        Font = Enum.Font.Gotham,
+        TextSize = textSize or 12,
+        TextColor3 = Color3.fromRGB(225, 227, 240),
+        TextXAlignment = Enum.TextXAlignment.Left,
+        TextWrapped = true
+    }, parent)
+end
+
+local function button(parent, text, pos, size)
+    local b = make("TextButton", {
+        Position = pos,
+        Size = size,
+        BackgroundColor3 = Color3.fromRGB(46, 47, 64),
+        BorderSizePixel = 0,
+        Text = text,
+        Font = Enum.Font.GothamBold,
+        TextSize = 12,
+        TextColor3 = Color3.new(1, 1, 1),
+        AutoButtonColor = true
+    }, parent)
+    corner(b, 8)
     return b
 end
 
-local start = makeButton(
-    "▶   START AUTO FARM", 108, Color3.fromRGB(53, 139, 103)
+local farmTab = button(
+    sidebar, "⚒  Farm",
+    UDim2.fromOffset(7, 12),
+    UDim2.new(1, -14, 0, 38)
 )
 
-local stop = makeButton(
-    "■   STOP AUTO FARM", 154, Color3.fromRGB(164, 69, 78)
+local settingsTab = button(
+    sidebar, "⚙  Settings",
+    UDim2.fromOffset(7, 56),
+    UDim2.new(1, -14, 0, 38)
 )
 
-local footer = Instance.new("TextLabel")
-footer.Position = UDim2.new(0, 12, 1, -24)
-footer.Size = UDim2.new(1, -24, 0, 18)
-footer.BackgroundTransparency = 1
-footer.Text = "UGC HUB  •  v1.1"
-footer.TextColor3 = Color3.fromRGB(117, 124, 150)
-footer.Font = Enum.Font.Gotham
-footer.TextSize = 10
-footer.Parent = frame
+local statusLabel = label(
+    sidebar, "● Ready",
+    UDim2.fromOffset(9, 111),
+    UDim2.new(1, -18, 0, 42), 10
+)
+statusLabel.TextColor3 = Color3.fromRGB(120, 220, 165)
 
-local reopen = Instance.new("TextButton")
-reopen.Size = UDim2.fromOffset(54, 54)
-reopen.Position = UDim2.new(1, -70, 0.5, -27)
-reopen.BackgroundColor3 = Color3.fromRGB(48, 55, 86)
-reopen.Text = "UGC"
-reopen.TextColor3 = Color3.new(1, 1, 1)
-reopen.Font = Enum.Font.GothamBold
-reopen.TextSize = 14
-reopen.Visible = false
-reopen.Parent = gui
-corner(reopen, 18)
+local farmPage = make("Frame", {
+    Size = UDim2.fromScale(1, 1),
+    BackgroundTransparency = 1
+}, content)
 
-local function setStatus(message, color)
-    status.Text = "●  " .. message
-    if color then status.TextColor3 = color end
+local settingsPage = make("Frame", {
+    Size = UDim2.fromScale(1, 1),
+    BackgroundTransparency = 1,
+    Visible = false
+}, content)
+
+label(farmPage, "FARM CONTROL", UDim2.fromOffset(4, 4),
+    UDim2.new(1, -8, 0, 24), 15)
+
+label(farmPage, "Tween to FinishTrigger, then return to Area.",
+    UDim2.fromOffset(4, 31),
+    UDim2.new(1, -8, 0, 34), 11)
+
+local startButton = button(
+    farmPage, "▶   START AUTO FARM",
+    UDim2.fromOffset(4, 78),
+    UDim2.new(1, -8, 0, 42)
+)
+
+local stopButton = button(
+    farmPage, "■   STOP FARM",
+    UDim2.fromOffset(4, 128),
+    UDim2.new(1, -8, 0, 42)
+)
+
+label(farmPage, "Use only where you have permission.",
+    UDim2.fromOffset(4, 185),
+    UDim2.new(1, -8, 0, 30), 10)
+
+label(settingsPage, "SETTINGS", UDim2.fromOffset(4, 4),
+    UDim2.new(1, -8, 0, 24), 15)
+
+label(settingsPage, "UI SIZE", UDim2.fromOffset(4, 34),
+    UDim2.new(0.5, -4, 0, 20), 11)
+
+local sizeDown = button(
+    settingsPage, "−",
+    UDim2.new(0, 4, 0, 57),
+    UDim2.fromOffset(35, 30)
+)
+
+local sizeValue = label(
+    settingsPage, "100%",
+    UDim2.new(0, 44, 0, 57),
+    UDim2.fromOffset(55, 30), 12
+)
+sizeValue.TextXAlignment = Enum.TextXAlignment.Center
+
+local sizeUp = button(
+    settingsPage, "+",
+    UDim2.new(0, 104, 0, 57),
+    UDim2.fromOffset(35, 30)
+)
+
+label(settingsPage, "TWEEN DURATION",
+    UDim2.fromOffset(4, 96),
+    UDim2.new(1, -8, 0, 20), 11)
+
+local tweenDown = button(
+    settingsPage, "−",
+    UDim2.new(0, 4, 0, 119),
+    UDim2.fromOffset(35, 30)
+)
+
+local tweenValue = label(
+    settingsPage, "2.0 sec",
+    UDim2.new(0, 44, 0, 119),
+    UDim2.fromOffset(95, 30), 12
+)
+tweenValue.TextXAlignment = Enum.TextXAlignment.Center
+
+local tweenUp = button(
+    settingsPage, "+",
+    UDim2.new(0, 144, 0, 119),
+    UDim2.fromOffset(35, 30)
+)
+
+label(settingsPage, "THEME COLOR",
+    UDim2.fromOffset(4, 159),
+    UDim2.new(1, -8, 0, 20), 11)
+
+local themeButton = button(
+    settingsPage, "Purple  ●",
+    UDim2.fromOffset(4, 182),
+    UDim2.new(1, -8, 0, 34)
+)
+
+local function applyTheme()
+    accent = themes[themeNames[themeIndex]]
+    farmTab.BackgroundColor3 = accent
+    settingsTab.BackgroundColor3 = Color3.fromRGB(46, 47, 64)
+    stroke(frame, accent, 1.5).Color = accent
+    themeButton.Text = themeNames[themeIndex] .. "  ●"
+    themeButton.BackgroundColor3 = accent
+    startButton.BackgroundColor3 = accent
 end
 
-local function openUI()
-    reopen.Visible = false
-    frame.Visible = true
-    scale.Scale = 0.82
-    frame.BackgroundTransparency = 0.15
-
-    tween(scale, TweenInfo.new(
-        0.24, Enum.EasingStyle.Back, Enum.EasingDirection.Out
-    ), {Scale = 1})
-
-    tween(frame, TweenInfo.new(0.18), {
-        BackgroundTransparency = 0
-    })
+local function setStatus(message)
+    statusLabel.Text = "● " .. tostring(message)
 end
 
-local function closeUI()
-    local t = tween(scale, TweenInfo.new(
-        0.16, Enum.EasingStyle.Quad, Enum.EasingDirection.In
-    ), {Scale = 0.78})
+local function showPage(page)
+    farmPage.Visible = page == "Farm"
+    settingsPage.Visible = page == "Settings"
 
-    tween(frame, TweenInfo.new(0.16), {
-        BackgroundTransparency = 0.3
-    })
+    farmTab.BackgroundColor3 = page == "Farm"
+        and accent or Color3.fromRGB(46, 47, 64)
 
-    t.Completed:Once(function()
-        frame.Visible = false
-        frame.BackgroundTransparency = 0
-        reopen.Visible = true
-    end)
+    settingsTab.BackgroundColor3 = page == "Settings"
+        and accent or Color3.fromRGB(46, 47, 64)
 end
 
-close.Activated:Connect(closeUI)
-reopen.Activated:Connect(openUI)
+farmTab.Activated:Connect(function()
+    showPage("Farm")
+end)
 
-local farm
-local loading = false
+settingsTab.Activated:Connect(function()
+    showPage("Settings")
+end)
+
+local function updateTweenTime()
+    tweenValue.Text = string.format("%.1f sec", tweenSeconds)
+    if farm then
+        farm:SetTweenTime(tweenSeconds)
+    end
+end
+
+sizeDown.Activated:Connect(function()
+    currentSize = math.max(70, currentSize - 10)
+    sizeValue.Text = currentSize .. "%"
+    TweenService:Create(scale, TweenInfo.new(0.12), {
+        Scale = currentSize / 100
+    }):Play()
+end)
+
+sizeUp.Activated:Connect(function()
+    currentSize = math.min(140, currentSize + 10)
+    sizeValue.Text = currentSize .. "%"
+    TweenService:Create(scale, TweenInfo.new(0.12), {
+        Scale = currentSize / 100
+    }):Play()
+end)
+
+tweenDown.Activated:Connect(function()
+    tweenSeconds = math.max(0.5, tweenSeconds - 0.5)
+    updateTweenTime()
+end)
+
+tweenUp.Activated:Connect(function()
+    tweenSeconds = math.min(10, tweenSeconds + 0.5)
+    updateTweenTime()
+end)
+
+themeButton.Activated:Connect(function()
+    themeIndex = themeIndex % #themeNames + 1
+    applyTheme()
+    showPage(settingsPage.Visible and "Settings" or "Farm")
+end)
 
 local function loadFarm()
     if farm then return farm end
     if loading then return nil end
+
     loading = true
-    setStatus("Loading farm script...")
+    setStatus("Loading...")
 
     local ok, result = pcall(function()
         local source = game:HttpGet(FARM_URL)
         local chunk = loadstring(source)
-        assert(chunk, "Lua compilation failed")
+        assert(chunk, "Could not compile autofarm.lua")
         return chunk()
     end)
 
@@ -209,47 +360,44 @@ local function loadFarm()
 
     if not ok then
         warn("[UGC HUB] Load error:", result)
-        setStatus("Load failed - check console",
-            Color3.fromRGB(255, 130, 130))
+        setStatus("Load failed")
         return nil
     end
 
     if type(result) ~= "table"
         or type(result.Start) ~= "function"
-        or type(result.Stop) ~= "function" then
-        setStatus("Invalid farm module",
-            Color3.fromRGB(255, 130, 130))
+        or type(result.Stop) ~= "function"
+        or type(result.SetTweenTime) ~= "function" then
+        setStatus("Invalid farm module")
         return nil
     end
 
     farm = result
+    farm:SetTweenTime(tweenSeconds)
     return farm
 end
 
-start.Activated:Connect(function()
+startButton.Activated:Connect(function()
     task.spawn(function()
         local module = loadFarm()
         if not module then return end
 
-        local ok, err = pcall(function()
-            module:Start(function(message)
-                setStatus(message)
-            end)
-        end)
-
-        if not ok then
-            warn("[UGC HUB] Start error:", err)
-            setStatus("Start failed",
-                Color3.fromRGB(255, 130, 130))
-        end
+        module:SetTweenTime(tweenSeconds)
+        module:Start(setStatus)
     end)
 end)
 
-stop.Activated:Connect(function()
+stopButton.Activated:Connect(function()
     if farm then
-        pcall(function() farm:Stop() end)
+        farm:Stop()
     end
     setStatus("Stopped")
 end)
 
-openUI()
+close.Activated:Connect(function()
+    if farm then farm:Stop() end
+    gui:Destroy()
+end)
+
+applyTheme()
+showPage("Farm")
