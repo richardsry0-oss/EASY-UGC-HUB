@@ -1,110 +1,172 @@
 
--- UGC HUB | Auto Farm Module
+-- UGC HUB | Tween Auto Farm
 -- File: autofarm.lua
 
 local Players = game:GetService("Players")
+local TweenService = game:GetService("TweenService")
+
 local player = Players.LocalPlayer
 
-local Farm = { Running = false }
+local Farm = {
+    Running = false,
+    TweenTime = 2,
+    ActiveTween = nil,
+    OnStatus = nil,
+}
+
+function Farm:SetTweenTime(seconds)
+    self.TweenTime = math.clamp(tonumber(seconds) or 2, 0.5, 10)
+end
 
 local function findTargets()
     local folder = workspace:FindFirstChild("End")
     if not folder then
-        return nil, nil, "Workspace.End folder not found"
+        return nil, nil, "Workspace.End not found"
     end
 
-    local endModel = folder:FindFirstChild("End")
-    local board = endModel and endModel:FindFirstChild("Board", true)
-    local area = folder:FindFirstChild("Area")
+    local trigger = folder:FindFirstChild("FinishTrigger", true)
+    local area = folder:FindFirstChild("Area", true)
 
-    if not endModel or not endModel:IsA("Model") then
-        return nil, nil, "End model not found"
-    end
-
-    if not board or not board:IsA("BasePart") then
-        return nil, nil, "Board part not found inside End model"
+    if not trigger or not trigger:IsA("BasePart") then
+        return nil, nil, "FinishTrigger BasePart not found"
     end
 
     if not area then
-        return nil, nil, "Area not found inside Workspace.End"
+        return nil, nil, "Area not found"
     end
 
-    local areaPart
+    local destination
+
     if area:IsA("BasePart") then
-        areaPart = area
+        destination = area
     elseif area:IsA("Model") then
-        areaPart = area.PrimaryPart
+        destination = area.PrimaryPart
             or area:FindFirstChildWhichIsA("BasePart", true)
-    elseif area:IsA("Folder") then
-        areaPart = area:FindFirstChildWhichIsA("BasePart", true)
+    else
+        destination = area:FindFirstChildWhichIsA("BasePart", true)
     end
 
-    if not areaPart then
-        return nil, nil, "No BasePart found inside Area"
+    if not destination then
+        return nil, nil, "No part inside Area"
     end
 
-    return board, areaPart
+    return trigger, destination
+end
+
+local function status(message)
+    if Farm.OnStatus then
+        Farm.OnStatus(message)
+    end
+end
+
+local function tweenTo(root, targetCFrame)
+    if not Farm.Running or not root.Parent then
+        return false
+    end
+
+    local distance = (root.Position - targetCFrame.Position).Magnitude
+
+    -- Scale duration with distance while respecting the chosen setting.
+    local duration = math.clamp(
+        distance / 60 * Farm.TweenTime,
+        0.5,
+        10
+    )
+
+    local tween = TweenService:Create(
+        root,
+        TweenInfo.new(
+            duration,
+            Enum.EasingStyle.Linear,
+            Enum.EasingDirection.Out
+        ),
+        { CFrame = targetCFrame }
+    )
+
+    Farm.ActiveTween = tween
+    tween:Play()
+
+    local result = tween.Completed:Wait()
+    if Farm.ActiveTween == tween then
+        Farm.ActiveTween = nil
+    end
+
+    return Farm.Running
+        and result == Enum.PlaybackState.Completed
 end
 
 function Farm:Start(onStatus)
     if self.Running then return end
+
     self.Running = true
+    self.OnStatus = onStatus
 
     task.spawn(function()
         while self.Running do
-            local board, areaPart, err = findTargets()
+            local trigger, destination, err = findTargets()
+
+            if not trigger then
+                status(err)
+                task.wait(2)
+                continue
+            end
+
             local character = player.Character
             local root = character
                 and character:FindFirstChild("HumanoidRootPart")
 
-            if not board then
-                if onStatus then onStatus(err) end
-                warn("[UGC HUB] " .. err)
-                task.wait(2)
-            elseif not root then
-                if onStatus then onStatus("Waiting for character...") end
+            if not root then
+                status("Waiting for character...")
                 task.wait(1)
-            else
-                if onStatus then onStatus("Moving to Board...") end
-
-                root.CFrame = board.CFrame + Vector3.new(0, 3, 0)
-                task.wait(1)
-
-                if not self.Running then break end
-
-                -- Optional executor-supported touch request.
-                -- The server may not accept client-simulated touches.
-                if typeof(firetouchinterest) == "function" then
-                    pcall(function()
-                        firetouchinterest(root, board, 0)
-                        task.wait(0.15)
-                        firetouchinterest(root, board, 1)
-                    end)
-                end
-
-                task.wait(0.5)
-
-                if not self.Running then break end
-
-                character = player.Character
-                root = character
-                    and character:FindFirstChild("HumanoidRootPart")
-
-                if root and areaPart.Parent then
-                    if onStatus then onStatus("Moving to Area...") end
-                    root.CFrame = areaPart.CFrame + Vector3.new(0, 3, 0)
-                end
-
-                task.wait(1)
+                continue
             end
+
+            status("Tweening to FinishTrigger...")
+
+            local reached = tweenTo(
+                root,
+                trigger.CFrame + Vector3.new(0, 2, 0)
+            )
+
+            if not reached then
+                break
+            end
+
+            -- Allow the game time to process the trigger.
+            status("Waiting for trigger...")
+            task.wait(0.75)
+
+            if not self.Running then break end
+
+            character = player.Character
+            root = character
+                and character:FindFirstChild("HumanoidRootPart")
+
+            if root and destination.Parent then
+                status("Tweening to Area...")
+
+                tweenTo(
+                    root,
+                    destination.CFrame + Vector3.new(0, 3, 0)
+                )
+            end
+
+            task.wait(1)
         end
 
-        if onStatus then onStatus("Stopped") end
+        self.Running = false
+        self.ActiveTween = nil
+        status("Stopped")
     end)
 end
 
 function Farm:Stop()
     self.Running = false
+
+    if self.ActiveTween then
+        self.ActiveTween:Cancel()
+        self.ActiveTween = nil
+    end
 end
 
 return Farm
